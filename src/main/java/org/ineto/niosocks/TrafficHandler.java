@@ -1,5 +1,10 @@
 package org.ineto.niosocks;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
@@ -14,16 +19,55 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 public class TrafficHandler extends SimpleChannelUpstreamHandler {
 
   private final Channel channel;
+  private byte[] contentRemoveByteArray;
 
-  public TrafficHandler(Channel channel) {
+  private static AtomicInteger cnt = new AtomicInteger(100);
+  
+  public TrafficHandler(Properties props, Channel channel) {
     this.channel = channel;
+    String contentRemove = props.getProperty("content.modifier.remove", null);
+    if (contentRemove != null) {
+      try {
+        contentRemoveByteArray = contentRemove.getBytes("UTF-8");
+      }
+      catch(Exception e) {
+      }
+    }
   }
 
   @Override
   public void messageReceived(ChannelHandlerContext ctx, final MessageEvent e) throws Exception {
     ChannelBuffer msg = (ChannelBuffer) e.getMessage();
+    
+    /*
+    byte[] content = msg.toByteBuffer().array();
+
+    ByteArrayOutputStream bout = new ByteArrayOutputStream();
+    for (int i = 0; i != content.length; ++i) {
+      if (contentRemoveByteArray != null && content[i] == contentRemoveByteArray[0]) {
+        boolean match = true;
+        for (int j = 0; j != contentRemoveByteArray.length; ++j) {
+          if (i + j == content.length || content[i+j] != contentRemoveByteArray[j]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) {
+          i += contentRemoveByteArray.length - 1;
+        }
+        else {
+          bout.write(content[i]);
+        }
+      }
+      else {
+        bout.write(content[i]);
+      }
+    }
+    */
+    
     if (channel.isWritable()) {
-      Channels.write(channel, msg);
+      FileUtils.writeLog("recv", cnt.incrementAndGet(), msg.array());
+      Channels.write(channel, msg);//ChannelBuffers.wrappedBuffer(bout.toByteArray()));
     }
     else {
       e.getChannel().setReadable(false);

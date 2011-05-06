@@ -3,6 +3,7 @@ package org.ineto.niosocks;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
@@ -30,6 +31,8 @@ public class SocksServerHandler extends SimpleChannelHandler {
   
   private Channel outboundChannel = null;
   
+  private static AtomicInteger cnt = new AtomicInteger(100);
+  
   public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory) {
     super();
     this.props = props;
@@ -50,6 +53,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
     if (outboundChannel != null) {
       if (outboundChannel.isWritable()) {
+        FileUtils.writeLog("send", cnt.incrementAndGet(), msg.array());
         Channels.write(outboundChannel, msg);
       }
       else {
@@ -68,10 +72,8 @@ public class SocksServerHandler extends SimpleChannelHandler {
       inboundChannel.setReadable(false);
 
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
-      if (props.getProperty("outbound.connect.timeout") != null) { 
-        outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout"));
-      }
-      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(inboundChannel));
+      outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout", "30000"));
+      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel));
       ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
       outboundClientFuture.addListener(new ChannelFutureListener() {
 
