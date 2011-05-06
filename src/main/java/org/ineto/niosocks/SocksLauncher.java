@@ -1,3 +1,4 @@
+package org.ineto.niosocks;
 
 public class SocksLauncher {
 
