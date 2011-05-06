@@ -8,15 +8,12 @@ import java.util.concurrent.TimeUnit;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFactory;
-import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor;
 
 public class SocksServer {
-
-  private ChannelGroup clientsGroup;
   
   private Channel listenChannel;
   private OrderedMemoryAwareThreadPoolExecutor pipelineExecutor;
@@ -25,7 +22,10 @@ public class SocksServer {
   
   public SocksServer(Properties props) {
     
-    int port = Integer.parseInt(props.getProperty("socks.port"));
+    int port = 1080;
+    if (props.getProperty("socks.port") != null) {
+      port = Integer.parseInt(props.getProperty("socks.port"));
+    }
 
     int threads = 1;
     if (props.getProperty("server.threads") == null) {
@@ -41,7 +41,7 @@ public class SocksServer {
     // 200 threads max, Memory limitation: 1MB by channel, 1GB global, 100 ms of timeout
     pipelineExecutor = new OrderedMemoryAwareThreadPoolExecutor(200, 1048576, 1073741824, 100, TimeUnit.MILLISECONDS, Executors.defaultThreadFactory());
 
-    bootstrap.setPipelineFactory(new SocksPipelineFactory(clientsGroup, pipelineExecutor, clientFactory));
+    bootstrap.setPipelineFactory(new SocksPipelineFactory(props, pipelineExecutor, clientFactory));
     bootstrap.setOption("child.tcpNoDelay", true);
     bootstrap.setOption("child.keepAlive", true);
     bootstrap.setOption("child.reuseAddress", true);
@@ -59,7 +59,6 @@ public class SocksServer {
   public void shutdown() {
     System.out.println("Shutdown server");
     listenChannel.close().awaitUninterruptibly();
-    clientsGroup.close().awaitUninterruptibly();
     pipelineExecutor.shutdownNow();
     factory.releaseExternalResources();
     clientFactory.releaseExternalResources();

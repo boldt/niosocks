@@ -2,8 +2,7 @@ package org.ineto.niosocks;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.jboss.netty.bootstrap.ClientBootstrap;
@@ -18,42 +17,42 @@ import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
-import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
 
 public class SocksServerHandler extends SimpleChannelHandler {
 
   private final static Logger log = Logger.getLogger(SocksServerHandler.class);
   
+  private final Properties props;
   private final ClientSocketChannelFactory clientFactory;
-  private final ChannelGroup clientsGroup;
   
   private static final byte[] RESPONSE_OK = new byte[] { 0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   
-  private ConcurrentMap<Channel, Channel> in2outMap = new ConcurrentHashMap<Channel, Channel>();
+  private Channel outboundChannel = null;
   
-  public SocksServerHandler(ClientSocketChannelFactory clientFactory, ChannelGroup clientsGroup) {
+  public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory) {
     super();
+    this.props = props;
     this.clientFactory = clientFactory;
-    this.clientsGroup = clientsGroup;
   }
 
-  public static String toHexString(byte abyte0[]) {
-    StringBuffer stringbuffer = new StringBuffer(abyte0.length * 2 + 1);
-    for (int i = 0; i < abyte0.length; i++)
-      stringbuffer.append(Integer.toHexString(abyte0[i]));
+  public static String toHexString(byte blob[]) {
+    StringBuffer out = new StringBuffer(blob.length * 2 + 1);
+    for (int i = 0; i < blob.length; i++)
+      out.append(Integer.toHexString(blob[i]));
 
-    return stringbuffer.toString();
+    return out.toString();
   }
   
   @Override
   public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
     ChannelBuffer msg = (ChannelBuffer) e.getMessage();
-    
-    Channel outboundChannel = in2outMap.get(e.getChannel());
+
     if (outboundChannel != null) {
-      Channels.write(outboundChannel, msg);
-      if (!outboundChannel.isWritable()) {
+      if (outboundChannel.isWritable()) {
+        Channels.write(outboundChannel, msg);
+      }
+      else {
         e.getChannel().setReadable(false);
       }
       return;
@@ -61,29 +60,37 @@ public class SocksServerHandler extends SimpleChannelHandler {
     
     if (msg.capacity() > 8 && msg.getByte(0) == 4 && msg.getByte(1) == 1) {
       byte[] addr = new byte[] { msg.getByte(4), msg.getByte(5), msg.getByte(6), msg.getByte(7) };
-      int outboundClientPort = (((0xFF & msg.getByte(2)) << 8) + (0xFF & msg.getByte(3)));
-      InetAddress outboundClientIP = InetAddress.getByAddress(addr);
-      log.info("Connect " + outboundClientIP.getHostAddress() + ":" + outboundClientPort);
+      final int outboundClientPort = (((0xFF & msg.getByte(2)) << 8) + (0xFF & msg.getByte(3)));
+      final InetAddress outboundClientIP = InetAddress.getByAddress(addr);
+      System.out.println("Connect " + outboundClientIP.getHostAddress() + ":" + outboundClientPort);
       
       final Channel inboundChannel = e.getChannel();
       inboundChannel.setReadable(false);
 
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
-      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(e.getChannel()));
+      if (props.getProperty("outbound.connect.timeout") != null) { 
+        try {
+          outboundClientBootstrap.setOption("connectTimeoutMillis", Integer.parseInt(props.getProperty("outbound.connect.timeout")));
+        }
+        catch(NumberFormatException ex) {
+          log.error("invalid number format for option 'outbound.connect.timeout'", ex);
+        }
+      }
+      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(inboundChannel));
       ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
       outboundClientFuture.addListener(new ChannelFutureListener() {
 
         @Override
         public void operationComplete(ChannelFuture outboundClientFuture) throws Exception {
-          System.out.println("Outbound Channel " + outboundClientFuture.getChannel() + ", success = " + outboundClientFuture.isSuccess());
           if (outboundClientFuture.isSuccess()) {
-            in2outMap.put(inboundChannel, outboundClientFuture.getChannel());
-            //inboundChannel.getPipeline().addLast("handler", new TrafficHandler(outboundClientFuture.getChannel()));
+            System.out.println("Outbound Channel SUCCESS " + outboundClientFuture.getChannel().getRemoteAddress());
+            outboundChannel = outboundClientFuture.getChannel();
             inboundChannel.setReadable(true);
           }
           else {
-            inboundChannel.close();
-          }
+            System.out.println("Outbound Channel FAIL " + outboundClientIP.getHostAddress() + ":" + outboundClientPort);
+            Channels.close(inboundChannel);
+           }
         }
         
       });
@@ -98,15 +105,22 @@ public class SocksServerHandler extends SimpleChannelHandler {
   
   @Override
   public void channelClosed(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
-    in2outMap.remove(e.getChannel());
+    closeOnFlush(e.getChannel());
   }
   
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) {
     log.error("Unexpected exception from downstream.", e.getCause());
-    clientsGroup.remove(e.getChannel());
-    in2outMap.remove(e.getChannel());
     Channels.close(e.getChannel());
+    if (outboundChannel != null && outboundChannel.isConnected()) {
+      Channels.close(outboundChannel);
+    }
+  }
+  
+  private static void closeOnFlush(Channel ch) {
+    if (ch.isConnected()) {
+      ch.write(ChannelBuffers.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+    }
   }
   
 }
