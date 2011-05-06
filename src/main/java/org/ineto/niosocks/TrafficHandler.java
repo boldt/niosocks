@@ -1,7 +1,5 @@
 package org.ineto.niosocks;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,14 +16,17 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 
 public class TrafficHandler extends SimpleChannelUpstreamHandler {
 
-  private final int connectionId;
   private final Channel channel;
+  private final int connectionId;
+  private final TrafficLogger trafficLogger;
+  
   private byte[] contentRemoveByteArray;
   private AtomicInteger num = new AtomicInteger(0);
   
-  public TrafficHandler(Properties props, Channel channel, int connectionId) {
+  public TrafficHandler(Properties props, Channel channel, int connectionId, TrafficLogger trafficLogger) {
     this.channel = channel;
     this.connectionId = connectionId;
+    this.trafficLogger = trafficLogger;
     String contentRemove = props.getProperty("content.modifier.remove", null);
     if (contentRemove != null) {
       try {
@@ -67,7 +68,7 @@ public class TrafficHandler extends SimpleChannelUpstreamHandler {
     */
     
     if (channel.isWritable()) {
-      FileUtils.writeLog(connectionId, "recv", num.incrementAndGet(), msg.array());
+      trafficLogger.log(connectionId, "recv", num.incrementAndGet(), msg.array());
       Channels.write(channel, msg);//ChannelBuffers.wrappedBuffer(bout.toByteArray()));
     }
     else {

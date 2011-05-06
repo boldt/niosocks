@@ -26,6 +26,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
   
   private final Properties props;
   private final ClientSocketChannelFactory clientFactory;
+  private final TrafficLogger trafficLogger;
   
   private static final byte[] RESPONSE_OK = new byte[] { 0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   private static AtomicInteger connectionIdFactory = new AtomicInteger(10000);
@@ -34,10 +35,11 @@ public class SocksServerHandler extends SimpleChannelHandler {
   private int connectionId = 0;
   private AtomicInteger num = new AtomicInteger(0);
   
-  public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory) {
+  public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory, TrafficLogger trafficLogger) {
     super();
     this.props = props;
     this.clientFactory = clientFactory;
+    this.trafficLogger = trafficLogger;
   }
 
   public static String toHexString(byte blob[]) {
@@ -54,7 +56,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
     if (outboundChannel != null) {
       if (outboundChannel.isWritable()) {
-        FileUtils.writeLog(connectionId, "send", num.incrementAndGet(), msg.array());
+        trafficLogger.log(connectionId, "send", num.incrementAndGet(), msg.array());
         Channels.write(outboundChannel, msg);
       }
       else {
@@ -75,7 +77,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
       outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout", "30000"));
-      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel, connectionId));
+      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel, connectionId, trafficLogger));
       ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
       outboundClientFuture.addListener(new ChannelFutureListener() {
 
