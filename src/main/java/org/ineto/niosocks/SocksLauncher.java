@@ -23,7 +23,7 @@ public class SocksLauncher {
     
     System.out.println("Socks Server started at " + props.getProperty("socks.port") + " port");
 
-    final SocksServer server = new SocksServer(props);
+    final SocksServer server = new SocksServer(homeDir, props);
     
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override

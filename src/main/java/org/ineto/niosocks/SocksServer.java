@@ -21,7 +21,7 @@ public class SocksServer {
   private ClientSocketChannelFactory clientFactory;
   private TrafficLogger trafficLogger;
   
-  public SocksServer(Properties props) {
+  public SocksServer(String homeDir, Properties props) {
     
     int port = 1080;
     if (props.getProperty("socks.port") != null) {
@@ -35,7 +35,7 @@ public class SocksServer {
       threads = Integer.parseInt(props.getProperty("socks.threads"));
     }
 
-    trafficLogger = new TrafficLogger(props);
+    trafficLogger = new TrafficLogger(homeDir, props);
     
     clientFactory =  new NioClientSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool());
     factory = new NioServerSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool(), threads);

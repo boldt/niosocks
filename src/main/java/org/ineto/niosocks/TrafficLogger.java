@@ -14,8 +14,10 @@ public class TrafficLogger {
   
   private boolean enable;
   private ExecutorService logExecutor;
+  private String homeDir;
   
-  public TrafficLogger(Properties props) {
+  public TrafficLogger(String homeDir, Properties props) {
+    this.homeDir = homeDir;
     enable = "yes".equalsIgnoreCase(props.getProperty("log.enable", "yes"));
     if (enable) {
       int logthreads = Integer.parseInt(props.getProperty("log.threads", "1"));
@@ -39,7 +41,7 @@ public class TrafficLogger {
     return enable;
   }
   
-  public static class FileLogOperation implements Runnable {
+  public class FileLogOperation implements Runnable {
 
     private int connectionId;
     private String logfile;
@@ -61,9 +63,9 @@ public class TrafficLogger {
     
   }
   
-  public static void writeLog(int connectionId, String logfile, int num, byte[] blob) {
+  public void writeLog(int connectionId, String logfile, int num, byte[] blob) {
     try {
-      FileOutputStream out = new FileOutputStream("../log/" + connectionId + "_" + logfile + num);
+      FileOutputStream out = new FileOutputStream(homeDir + "/log/" + connectionId + "_" + logfile + num);
       try {
         out.write(blob);
       }
