@@ -69,12 +69,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
       if (props.getProperty("outbound.connect.timeout") != null) { 
-        try {
-          outboundClientBootstrap.setOption("connectTimeoutMillis", Integer.parseInt(props.getProperty("outbound.connect.timeout")));
-        }
-        catch(NumberFormatException ex) {
-          log.error("invalid number format for option 'outbound.connect.timeout'", ex);
-        }
+        outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout"));
       }
       outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(inboundChannel));
       ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
