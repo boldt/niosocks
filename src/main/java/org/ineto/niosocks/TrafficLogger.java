@@ -18,7 +18,7 @@ public class TrafficLogger {
   
   public TrafficLogger(String homeDir, Properties props) {
     this.homeDir = homeDir;
-    enable = "yes".equalsIgnoreCase(props.getProperty("log.enable", "yes"));
+    enable = "yes".equalsIgnoreCase(props.getProperty("log.traffic", "yes"));
     if (enable) {
       int logthreads = Integer.parseInt(props.getProperty("log.threads", "1"));
       logExecutor = Executors.newFixedThreadPool(logthreads);
