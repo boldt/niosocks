@@ -18,13 +18,14 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 
 public class TrafficHandler extends SimpleChannelUpstreamHandler {
 
+  private final int connectionId;
   private final Channel channel;
   private byte[] contentRemoveByteArray;
-
-  private static AtomicInteger cnt = new AtomicInteger(100);
+  private AtomicInteger num = new AtomicInteger(0);
   
-  public TrafficHandler(Properties props, Channel channel) {
+  public TrafficHandler(Properties props, Channel channel, int connectionId) {
     this.channel = channel;
+    this.connectionId = connectionId;
     String contentRemove = props.getProperty("content.modifier.remove", null);
     if (contentRemove != null) {
       try {
@@ -66,7 +67,7 @@ public class TrafficHandler extends SimpleChannelUpstreamHandler {
     */
     
     if (channel.isWritable()) {
-      FileUtils.writeLog("recv", cnt.incrementAndGet(), msg.array());
+      FileUtils.writeLog(connectionId, "recv", num.incrementAndGet(), msg.array());
       Channels.write(channel, msg);//ChannelBuffers.wrappedBuffer(bout.toByteArray()));
     }
     else {

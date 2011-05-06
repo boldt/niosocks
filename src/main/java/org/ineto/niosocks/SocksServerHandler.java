@@ -28,10 +28,11 @@ public class SocksServerHandler extends SimpleChannelHandler {
   private final ClientSocketChannelFactory clientFactory;
   
   private static final byte[] RESPONSE_OK = new byte[] { 0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+  private static AtomicInteger connectionIdFactory = new AtomicInteger(10000);
   
   private Channel outboundChannel = null;
-  
-  private static AtomicInteger cnt = new AtomicInteger(100);
+  private int connectionId = 0;
+  private AtomicInteger num = new AtomicInteger(0);
   
   public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory) {
     super();
@@ -53,7 +54,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
     if (outboundChannel != null) {
       if (outboundChannel.isWritable()) {
-        FileUtils.writeLog("send", cnt.incrementAndGet(), msg.array());
+        FileUtils.writeLog(connectionId, "send", num.incrementAndGet(), msg.array());
         Channels.write(outboundChannel, msg);
       }
       else {
@@ -70,10 +71,11 @@ public class SocksServerHandler extends SimpleChannelHandler {
       
       final Channel inboundChannel = e.getChannel();
       inboundChannel.setReadable(false);
+      connectionId = connectionIdFactory.incrementAndGet();
 
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
       outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout", "30000"));
-      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel));
+      outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel, connectionId));
       ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
       outboundClientFuture.addListener(new ChannelFutureListener() {
 

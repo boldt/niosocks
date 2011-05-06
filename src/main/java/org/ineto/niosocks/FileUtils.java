@@ -9,9 +9,9 @@ public class FileUtils {
 
   private final static Logger log = Logger.getLogger(FileUtils.class);
 
-  public static void writeLog(String logfile, int num, byte[] blob) {
+  public static void writeLog(int connectionId, String logfile, int num, byte[] blob) {
     try {
-      FileOutputStream out = new FileOutputStream("../log/" + logfile + num);
+      FileOutputStream out = new FileOutputStream("../log/" + connectionId + "_" + logfile + num);
       try {
         out.write(blob);
       }
