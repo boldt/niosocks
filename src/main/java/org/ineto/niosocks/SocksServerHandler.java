@@ -1,7 +1,7 @@
 package org.ineto.niosocks;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ProtocolException;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -28,12 +28,13 @@ public class SocksServerHandler extends SimpleChannelHandler {
   private final ClientSocketChannelFactory clientFactory;
   private final TrafficLogger trafficLogger;
   
-  private static final byte[] RESPONSE_OK = new byte[] { 0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   private static AtomicInteger connectionIdFactory = new AtomicInteger(10000);
   
   private Channel outboundChannel = null;
   private int connectionId = 0;
   private AtomicInteger num = new AtomicInteger(0);
+  
+  private SocksProtocol socksProtocol = null;
   
   public SocksServerHandler(Properties props, ClientSocketChannelFactory clientFactory, TrafficLogger trafficLogger) {
     super();
@@ -65,11 +66,35 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
     
-    if (msg.capacity() > 8 && msg.getByte(0) == 4 && msg.getByte(1) == 1) {
-      byte[] addr = new byte[] { msg.getByte(4), msg.getByte(5), msg.getByte(6), msg.getByte(7) };
-      final int outboundClientPort = (((0xFF & msg.getByte(2)) << 8) + (0xFF & msg.getByte(3)));
-      final InetAddress outboundClientIP = InetAddress.getByAddress(addr);
-      System.out.println("Connect " + outboundClientIP.getHostAddress() + ":" + outboundClientPort);
+    System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
+
+    if (socksProtocol == null) {
+      try {
+        socksProtocol = SocksProtocols.create(msg);
+      }
+      catch(ProtocolException ex) {
+        log.warn("unknown protocol for " + toHexString(msg.array()), ex);
+        Channels.close(e.getChannel());
+        return;
+      }
+    }
+    
+    try {
+      socksProtocol.processMessage(msg);
+    }
+    catch(ProtocolException ex) {
+      log.warn("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()), ex);
+      Channels.close(e.getChannel());
+      return;
+    }
+    
+    if (socksProtocol.hasResponse()) {
+      Channels.write(e.getChannel(), ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
+    }
+    
+    if (socksProtocol.isReady()) {
+      final InetSocketAddress outboundAddress = socksProtocol.getOutboundAddress();
+      System.out.println("Connect " + outboundAddress);
       
       final Channel inboundChannel = e.getChannel();
       inboundChannel.setReadable(false);
@@ -78,7 +103,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
       ClientBootstrap outboundClientBootstrap = new ClientBootstrap(clientFactory);
       outboundClientBootstrap.setOption("connectTimeoutMillis", props.getProperty("outbound.connect.timeout", "30000"));
       outboundClientBootstrap.getPipeline().addLast("handler", new TrafficHandler(props, inboundChannel, connectionId, trafficLogger));
-      ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(new InetSocketAddress(outboundClientIP, outboundClientPort));
+      ChannelFuture outboundClientFuture = outboundClientBootstrap.connect(outboundAddress);
       outboundClientFuture.addListener(new ChannelFutureListener() {
 
         @Override
@@ -89,17 +114,12 @@ public class SocksServerHandler extends SimpleChannelHandler {
             inboundChannel.setReadable(true);
           }
           else {
-            System.out.println("Outbound Channel FAIL " + outboundClientIP.getHostAddress() + ":" + outboundClientPort);
+            System.out.println("Outbound Channel FAIL " + outboundAddress);
             Channels.close(inboundChannel);
            }
         }
         
       });
-      System.out.println("Send OK");
-      Channels.write(e.getChannel(), ChannelBuffers.wrappedBuffer(RESPONSE_OK));
-    }
-    else {
-      Channels.close(e.getChannel());
     }
     
   }
