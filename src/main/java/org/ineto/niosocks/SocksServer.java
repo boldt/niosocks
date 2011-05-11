@@ -48,7 +48,6 @@ public class SocksServer {
     bootstrap.setOption("child.tcpNoDelay", true);
     bootstrap.setOption("child.keepAlive", true);
     bootstrap.setOption("child.reuseAddress", true);
-    bootstrap.setOption("child.connectTimeoutMillis", 100);
     bootstrap.setOption("readWriteFair", true);
 
     listenChannel = bootstrap.bind(new InetSocketAddress(port));
