@@ -19,7 +19,8 @@ public class Socks4Protocol implements SocksProtocol {
   public void processMessage(ChannelBuffer msg) throws ProtocolException {
     response = null;
     if (msg.capacity() >= 8 && msg.getByte(0) == 4 && msg.getByte(1) == 1) {
-      byte[] addr = new byte[] { msg.getByte(4), msg.getByte(5), msg.getByte(6), msg.getByte(7) };
+      byte[] addr = new byte[4];
+      msg.getBytes(4, addr);
       int port = (((0xFF & msg.getByte(2)) << 8) + (0xFF & msg.getByte(3)));
       try {
         address = new InetSocketAddress(InetAddress.getByAddress(addr), port);
@@ -27,8 +28,10 @@ public class Socks4Protocol implements SocksProtocol {
       catch(UnknownHostException e) {
         throw new ProtocolException("invalid ip address " + addr);
       }
-    }    
-    throw new ProtocolException("invalid request type");
+    } 
+    else {
+      throw new ProtocolException("invalid request type");
+    }
   }
 
   @Override
