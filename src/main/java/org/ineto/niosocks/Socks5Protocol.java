@@ -88,6 +88,9 @@ public class Socks5Protocol implements SocksProtocol {
     else if (addressType == AddressType.DOMAIN.ordinal()) {
       connectDomain(msg);
     }
+    else if (addressType == AddressType.IPv6.ordinal()) {
+      connectIPv6(msg);
+    }
     else {
       throw new ProtocolException("unsupported address type " + addressType);
     }      
@@ -95,7 +98,8 @@ public class Socks5Protocol implements SocksProtocol {
   
   public void connectIPv4(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 10);
-    byte[] addr = new byte[] { msg.getByte(4), msg.getByte(5), msg.getByte(6), msg.getByte(7) };
+    byte[] addr = new byte[4];
+    msg.getBytes(4, addr);
     int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
     try {
       address = new InetSocketAddress(InetAddress.getByAddress(addr), port);
@@ -110,12 +114,23 @@ public class Socks5Protocol implements SocksProtocol {
     int cnt = msg.getByte(4);
     checkCapacity(msg, 5 + cnt + 2);
     byte[] domain = new byte[cnt];
-    for (int i = 0; i != cnt; ++i) {
-      domain[i] = msg.getByte(5 + i);
-    }
+    msg.getBytes(5, domain);
     int port = (((0xFF & msg.getByte(5 + cnt)) << 8) + (0xFF & msg.getByte(5 + cnt + 1)));
     address = new InetSocketAddress(new String(domain), port);
   }
+  
+  public void connectIPv6(ChannelBuffer msg) throws ProtocolException {
+    checkCapacity(msg, 22);
+    byte[] addr = new byte[16];
+    msg.getBytes(4, addr);
+    int port = (((0xFF & msg.getByte(20)) << 8) + (0xFF & msg.getByte(21)));
+    try {
+      address = new InetSocketAddress(InetAddress.getByAddress(addr), port);
+    }
+    catch(UnknownHostException e) {
+      throw new ProtocolException("invalid ip address " + addr);
+    }
+  }  
   
   public static boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 3);
