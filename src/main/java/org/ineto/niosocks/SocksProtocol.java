@@ -17,4 +17,6 @@ public interface SocksProtocol {
   
   public InetSocketAddress getOutboundAddress();
   
+  public void setConnected(boolean connected);
+  
 }

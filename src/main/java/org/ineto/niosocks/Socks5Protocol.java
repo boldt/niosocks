@@ -24,17 +24,20 @@ public class Socks5Protocol implements SocksProtocol {
     IPv6;
   }
   
-  private static final int ASK_AUTH = 0;
-  private static final int REQUEST = 1;
+  public enum Step {
+    ASK_AUTH,
+    REQUEST,
+    CONNECT;
+  }
   
-  private int step = 0;
+  private Step step = Step.ASK_AUTH;
   private byte[] response = null;
   private InetSocketAddress address = null;
   
   @Override
   public void processMessage(ChannelBuffer msg) throws ProtocolException {
     response = null;
-    switch(step++) {
+    switch(step) {
     case ASK_AUTH:
       if (isAskAuth(msg)) {
         response = selectAuth(SocksAuth.NO_AUTH);
@@ -47,15 +50,22 @@ public class Socks5Protocol implements SocksProtocol {
       if (isConnectionRequest(msg)) {
         processConnection(msg);
         response = msg.array();
-        response[1] = 0;
       }
       else {
         throw new ProtocolException("unsupported command");
       }
       break;
     }
+    step = Step.values()[step.ordinal() + 1];
   }
 
+  @Override
+  public void setConnected(boolean connected) {
+    if (step == Step.CONNECT && response != null && response.length >= 2) {
+      response[1] = connected ? (byte) 0 : 1;
+    }
+  }
+  
   @Override
   public boolean hasResponse() {
     return response != null;

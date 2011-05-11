@@ -66,7 +66,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
     
-    System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
+    //System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
 
     if (socksProtocol == null) {
       try {
@@ -86,10 +86,6 @@ public class SocksServerHandler extends SimpleChannelHandler {
       log.warn("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()), ex);
       Channels.close(e.getChannel());
       return;
-    }
-    
-    if (socksProtocol.hasResponse()) {
-      Channels.write(e.getChannel(), ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
     }
     
     if (socksProtocol.isReady()) {
@@ -112,14 +108,27 @@ public class SocksServerHandler extends SimpleChannelHandler {
             System.out.println("Outbound Channel SUCCESS " + outboundClientFuture.getChannel().getRemoteAddress());
             outboundChannel = outboundClientFuture.getChannel();
             inboundChannel.setReadable(true);
+            socksProtocol.setConnected(true);
+            if (socksProtocol.hasResponse()) {
+              write(inboundChannel, ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
+            }
           }
           else {
             System.out.println("Outbound Channel FAIL " + outboundAddress);
-            Channels.close(inboundChannel);
+            socksProtocol.setConnected(false);
+            if (socksProtocol.hasResponse() && inboundChannel.isWritable()) {
+              Channels.write(inboundChannel, ChannelBuffers.wrappedBuffer(socksProtocol.getResponse())).addListener(ChannelFutureListener.CLOSE);
+            }
+            else {
+              Channels.close(inboundChannel);
+            }
            }
         }
         
       });
+    }
+    else if (socksProtocol.hasResponse()) {
+      write(e.getChannel(),  ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
     }
     
   }
@@ -141,6 +150,15 @@ public class SocksServerHandler extends SimpleChannelHandler {
   private static void closeOnFlush(Channel ch) {
     if (ch.isConnected()) {
       ch.write(ChannelBuffers.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+    }
+  }
+  
+  private static void write(Channel ch, ChannelBuffer msg) {
+    if (ch.isWritable()) {
+      ch.write(msg);
+    }
+    else {
+      ch.setReadable(false); 
     }
   }
   
