@@ -83,17 +83,17 @@ public class Socks5Protocol implements SocksProtocol {
     checkCapacity(msg, 4);
     int addressType = msg.getByte(3);
     if (addressType == AddressType.IPv4.ordinal()) {
-      processIPv4(msg);
+      connectIPv4(msg);
     }
     else if (addressType == AddressType.DOMAIN.ordinal()) {
-      processDomain(msg);
+      connectDomain(msg);
     }
     else {
       throw new ProtocolException("unsupported address type " + addressType);
     }      
   }
   
-  public void processIPv4(ChannelBuffer msg) throws ProtocolException {
+  public void connectIPv4(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 10);
     byte[] addr = new byte[] { msg.getByte(4), msg.getByte(5), msg.getByte(6), msg.getByte(7) };
     int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
@@ -105,7 +105,7 @@ public class Socks5Protocol implements SocksProtocol {
     }
   }
   
-  public void processDomain(ChannelBuffer msg) throws ProtocolException {
+  public void connectDomain(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 5);
     int cnt = msg.getByte(4);
     checkCapacity(msg, 5 + cnt + 2);
