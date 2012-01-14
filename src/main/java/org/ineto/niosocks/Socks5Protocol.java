@@ -9,39 +9,78 @@ import java.net.UnknownHostException;
 
 public class Socks5Protocol implements SocksProtocol {
 
-  public static final int VERSION = 5;
-
-  public enum Step {
+  private enum Step {
     ASK_AUTH,
     REQUEST,
     CONNECT;
   }
 
+  // Start with the AUTH
   private Step step = Step.ASK_AUTH;
   private byte[] response = null;
   private InetSocketAddress address = null;
 
+  // Stores the IP and prot of the connection
   private byte[] ip = null;
   private byte[] port = null;
 
   @Override
   public void processMessage(ChannelBuffer msg) throws ProtocolException {
 
-	  ip = new byte[4];
-	  port = new byte[2];
     response = null;
     switch(step) {
+	  /* The client connects to the server, and sends a version
+	   * identifier/method selection message:
+	   *
+       * +----+----------+----------+
+       * |VER | NMETHODS | METHODS  |
+       * +----+----------+----------+
+       * | 1  |    1     | 1 to 255 |
+       * +----+----------+----------+
+       *
+	   */
     case ASK_AUTH:
       if (isAskAuth(msg)) {
-        response = new byte[2];
-        response[0] = (byte) VERSION;
-        response[1] = (byte) 0x00;
+    	  /*
+    	   * The server selects from one of the methods given in METHODS, and
+    	   * sends a METHOD selection message:
+		   *
+           * +----+--------+
+           * |VER | METHOD |
+           * +----+--------+
+           * | 1  |   1    |
+           * +----+--------+
+           *
+           */
+    	  // We just accept NO AUTHENTICATION (0x00), so lets search for it
+    	  response = new byte[2];
+    	  response[0] = (byte) 0x05;
+    	  response[1] = (byte) 0x00;
+    	  /*
+    	  int nmethods = msg.getByte(1);
+    	  for(int i = 0; i < nmethods; i++) {
+    		  if(msg.getByte(1 + i) == 0x00) {
+    			  // Generate the METHOD selection message
+    		  }
+    	  }
+    	  */
       }
       else {
         throw new ProtocolException("invalid auth request");
       }
       break;
     case REQUEST:
+
+    	/*
+        The SOCKS request is formed as follows:
+
+            +----+-----+-------+------+----------+----------+
+            |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+            +----+-----+-------+------+----------+----------+
+            | 1  |  1  | X'00' |  1   | Variable |    2     |
+            +----+-----+-------+------+----------+----------+
+     */
+
       if (isConnectionRequest(msg)) {
     	  processConnection(msg);
       }
@@ -82,25 +121,48 @@ public class Socks5Protocol implements SocksProtocol {
 
   private void processConnection(ChannelBuffer msg) throws ProtocolException {
 
-	  System.out.println("processConnection(..)");
+	  ip = new byte[4];
+	  port = new byte[2];
 
-    if (!isConnectionRequest(msg)) {
-      throw new ProtocolException("unsupported command");
-    }
     checkCapacity(msg, 4);
 
-    response = new byte[10];
-    response[0] = 0x05;
-    response[1] = 0x01;
-    response[2] = 0x00;
+/*
+ *
+	The server evaluates the request, and
+   	returns a reply formed as follows:
+    +----+-----+-------+------+----------+----------+
+    |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+    +----+-----+-------+------+----------+----------+
+    | 1  |  1  | X'00' |  1   | Variable |    2     |
+    +----+-----+-------+------+----------+----------+
+ *
+ */
 
     int addressType = msg.getByte(3);
 
     // Type is IPv4
     if (addressType == 0x01) {
+        response = new byte[10];
+        response[0] = 0x05; // Version is SOCKS 5
+        response[2] = 0x00; // RSV is reserved
+    	response[3] = 0x01; // Address type is IPv4
 
-    	response[3] = 0x01;
-      connectIPv4(msg);
+    	// Port and ip is known because of the ATYP
+        response[4] = this.ip[0];
+        response[5] = this.ip[1];
+        response[6] = this.ip[2];
+        response[7] = this.ip[3];
+        response[8] = this.port[0];
+        response[9] = this.port[1];
+
+    	try {
+    		connectIPv4(msg);
+    		response[1] = 0x00; // succeeded
+		} catch (UnknownHostException e) {
+			response[1] = 0x04; // Host unreachable
+		} catch (ProtocolException e) {
+			response[1] = 0x01; // General SOCKS server failure
+		}
     }
 
     // Type is domain name
@@ -111,37 +173,24 @@ public class Socks5Protocol implements SocksProtocol {
 
     // Type is IPv6
     else if (addressType == 0x04) {
-    	response[3] = 0x04;
-      connectIPv6(msg);
+    	// not verified until now.
+    	//response[3] = 0x04;
+        //connectIPv6(msg);
     }
     else {
       throw new ProtocolException("unsupported address type " + addressType);
     }
-    response[4] = this.ip[0];
-    response[5] = this.ip[1];
-    response[6] = this.ip[2];
-    response[7] = this.ip[3];
-    response[8] = this.port[0];
-    response[9] = this.port[1];
   }
 
-  public void connectIPv4(ChannelBuffer msg) throws ProtocolException {
+  public void connectIPv4(ChannelBuffer msg) throws ProtocolException, UnknownHostException {
     checkCapacity(msg, 10);
     msg.getBytes(4, this.ip);
 
     this.port[0] = msg.getByte(8);
     this.port[1] = msg.getByte(9);
 
-    try {
-    	System.out.println("CONNECT TO:");
-    	System.out.println(this.ip);
-    	System.out.println(this.port);
-    	int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
-    	address = new InetSocketAddress(InetAddress.getByAddress(this.ip), port);
-    }
-    catch(UnknownHostException e) {
-      throw new ProtocolException("invalid ip address " + this.ip);
-    }
+	int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
+	address = new InetSocketAddress(InetAddress.getByAddress(this.ip), port);
   }
 
   public void connectDomain(ChannelBuffer msg) throws ProtocolException {
@@ -166,6 +215,9 @@ public class Socks5Protocol implements SocksProtocol {
     this.ip[3] = (byte) Integer.parseInt(ipParts[3]);
   }
 
+  /*
+   * NOT TESTED
+   */
   public void connectIPv6(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 22);
     byte[] addr = new byte[16];
@@ -180,6 +232,7 @@ public class Socks5Protocol implements SocksProtocol {
   }
 
   public static boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
+
     checkCapacity(msg, 3);
     // version = 0x05 && connection = 0x01
     if (msg.getByte(0) == 5 && msg.getByte(1) == 1) {
@@ -194,8 +247,13 @@ public class Socks5Protocol implements SocksProtocol {
     }
   }
 
+  /**
+   *
+   * @param msg
+   * @return
+   */
   public static boolean isAskAuth(ChannelBuffer msg) {
-    if (msg.capacity() >= 2 && msg.getByte(0) == 5) {
+    if (msg.capacity() >= 3 && msg.capacity() < 257 && msg.getByte(0) == 5) {
       int cnt = msg.getByte(1);
       if (msg.capacity() == cnt + 2) {
         return true;

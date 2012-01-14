@@ -9,7 +9,7 @@ NIOSocks  is an open source Java NIO Socks Proxy Solution
 
 Java >= 1.6
 
-## Run
+### Run
 
 Run SocksLauncher with the parameter to the config file 'assembly/conf'
 
