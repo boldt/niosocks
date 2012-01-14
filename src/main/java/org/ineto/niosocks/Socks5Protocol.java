@@ -270,7 +270,7 @@ public class Socks5Protocol implements SocksProtocol {
    * @return
    */
   public static boolean isAskAuth(ChannelBuffer msg) {
-    if (msg.capacity() >= 3 && msg.capacity() < 257 && msg.getByte(0) == 5) {
+    if (msg.capacity() >= 3 && msg.capacity() < 257) {
       int cnt = msg.getByte(1);
       if (msg.capacity() == cnt + 2) {
         return true;
