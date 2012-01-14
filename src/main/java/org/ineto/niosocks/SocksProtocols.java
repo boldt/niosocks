@@ -1,8 +1,8 @@
 package org.ineto.niosocks;
 
-import java.net.ProtocolException;
+import io.netty.buffer.ChannelBuffer;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.net.ProtocolException;
 
 public class SocksProtocols {
 
@@ -13,9 +13,9 @@ public class SocksProtocols {
       }
       else if (msg.getByte(0) == 5) {
         return new Socks5Protocol();
-      }      
+      }
     }
     throw new ProtocolException("unknown protocol");
   }
-  
+
 }

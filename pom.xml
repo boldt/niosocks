@@ -4,7 +4,7 @@
         <modelVersion>4.0.0</modelVersion>
         <groupId>org.ineto.niosocks</groupId>
         <artifactId>niosocks</artifactId>
-        <version>0.0.1${BUILD_TAG}</version>
+        <version>0.0.2${BUILD_TAG}</version>
         <packaging>jar</packaging>
         <name>NIOSocks</name>
         <description>NIOSocks - Open Source Java NIO Socks Proxy</description>
@@ -153,37 +153,24 @@
                         <version>4.5</version>
                         <scope>test</scope>
                 </dependency>
-                <dependency>
-                        <groupId>org.jboss.netty</groupId>
-                        <artifactId>netty</artifactId>
-                        <version>3.2.3.Final</version>
-                </dependency>
+				<dependency>
+					<groupId>io.netty</groupId>
+					<artifactId>netty</artifactId>
+					<version>4.0.0.Alpha1-SNAPSHOT</version>
+				</dependency>
                 <dependency>
                         <groupId>log4j</groupId>
                         <artifactId>log4j</artifactId>
                         <version>1.2.14</version>
                 </dependency>
-
-<dependency>
-    <groupId>javax.servlet</groupId>
-    <artifactId>jstl</artifactId>
-    <version>1.2</version>
-</dependency>
-
+				<dependency>
+				    <groupId>javax.servlet</groupId>
+				    <artifactId>jstl</artifactId>
+				    <version>1.2</version>
+				</dependency>
         </dependencies>
         <properties>
                 <BUILD_TAG>-SNAPSHOT</BUILD_TAG>
         </properties>
-        <repositories>
-                <repository>
-                        <id>repository.jboss.org</id>
-                        <url>http://repository.jboss.org/nexus/content/groups/public/</url>
-                        <releases>
-                                <enabled>true</enabled>
-                        </releases>
-                        <snapshots>
-                                <enabled>false</enabled>
-                        </snapshots>
-                </repository>
-        </repositories>
+
 </project>

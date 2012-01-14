@@ -1,39 +1,39 @@
 package org.ineto.niosocks;
 
+import io.netty.buffer.ChannelBuffer;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.net.UnknownHostException;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-
 public class Socks5Protocol implements SocksProtocol {
 
   public static final int VERSION = 5;
-  
+
   public enum SocksAuth {
     NO_AUTH,
     GSSAPI,
     USER_PASS;
   }
-  
+
   public enum AddressType {
     UNK,
     IPv4,
     DOMAIN,
     IPv6;
   }
-  
+
   public enum Step {
     ASK_AUTH,
     REQUEST,
     CONNECT;
   }
-  
+
   private Step step = Step.ASK_AUTH;
   private byte[] response = null;
   private InetSocketAddress address = null;
-  
+
   @Override
   public void processMessage(ChannelBuffer msg) throws ProtocolException {
     response = null;
@@ -65,7 +65,7 @@ public class Socks5Protocol implements SocksProtocol {
       response[1] = connected ? (byte) 0 : 1;
     }
   }
-  
+
   @Override
   public boolean hasResponse() {
     return response != null;
@@ -103,9 +103,9 @@ public class Socks5Protocol implements SocksProtocol {
     }
     else {
       throw new ProtocolException("unsupported address type " + addressType);
-    }      
+    }
   }
-  
+
   public void connectIPv4(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 10);
     byte[] addr = new byte[4];
@@ -118,7 +118,7 @@ public class Socks5Protocol implements SocksProtocol {
       throw new ProtocolException("invalid ip address " + addr);
     }
   }
-  
+
   public void connectDomain(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 5);
     int cnt = msg.getByte(4);
@@ -128,7 +128,7 @@ public class Socks5Protocol implements SocksProtocol {
     int port = (((0xFF & msg.getByte(5 + cnt)) << 8) + (0xFF & msg.getByte(5 + cnt + 1)));
     address = new InetSocketAddress(new String(domain), port);
   }
-  
+
   public void connectIPv6(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 22);
     byte[] addr = new byte[16];
@@ -140,8 +140,8 @@ public class Socks5Protocol implements SocksProtocol {
     catch(UnknownHostException e) {
       throw new ProtocolException("invalid ip address " + addr);
     }
-  }  
-  
+  }
+
   public static boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 3);
     if (msg.getByte(0) == 5 && msg.getByte(1) == 1 && msg.getByte(2) == 0) {
@@ -149,13 +149,13 @@ public class Socks5Protocol implements SocksProtocol {
     }
     return false;
   }
-  
+
   public static void checkCapacity(ChannelBuffer msg, int need) throws ProtocolException {
     if (msg.capacity() < need) {
       throw new ProtocolException("invalid capacity: need " + need + ", has " + msg.capacity());
     }
   }
-  
+
   public static boolean isAskAuth(ChannelBuffer msg) {
     if (msg.capacity() >= 2 && msg.getByte(0) == 5) {
       int cnt = msg.getByte(1);
@@ -165,18 +165,18 @@ public class Socks5Protocol implements SocksProtocol {
     }
     return false;
   }
-  
+
   public static byte[] selectAuth(SocksAuth auth) {
     byte[] response = new byte[2];
     response[0] = (byte) VERSION;
     response[1] = (byte) auth.ordinal();
     return response;
   }
-  
+
   @Override
   public String toString() {
     return "Socks5Protocol";
   }
-  
-  
+
+
 }
