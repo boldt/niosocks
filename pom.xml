@@ -168,7 +168,24 @@
 				    <artifactId>jstl</artifactId>
 				    <version>1.2</version>
 				</dependency>
+        		<dependency>
+					<groupId>de.uniluebeck.itm.itmutils</groupId>
+					<artifactId>itmutils</artifactId>
+					<version>0.3.4</version>
+				</dependency>
         </dependencies>
+		<repositories>
+			<repository>
+				<id>itm-maven-repository-snapshots</id>
+				<url>http://www.itm.uni-luebeck.de/projects/maven/releases/</url>
+				<releases>
+					<enabled>true</enabled>
+				</releases>
+				<snapshots>
+					<enabled>false</enabled>
+				</snapshots>
+			</repository>
+		</repositories>
         <properties>
                 <BUILD_TAG>-SNAPSHOT</BUILD_TAG>
         </properties>

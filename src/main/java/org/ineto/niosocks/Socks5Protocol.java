@@ -11,19 +11,6 @@ public class Socks5Protocol implements SocksProtocol {
 
   public static final int VERSION = 5;
 
-  public enum SocksAuth {
-    NO_AUTH,
-    GSSAPI,
-    USER_PASS;
-  }
-
-  public enum AddressType {
-    UNK,
-    IPv4,
-    DOMAIN,
-    IPv6;
-  }
-
   public enum Step {
     ASK_AUTH,
     REQUEST,
@@ -34,13 +21,21 @@ public class Socks5Protocol implements SocksProtocol {
   private byte[] response = null;
   private InetSocketAddress address = null;
 
+  private byte[] ip = null;
+  private byte[] port = null;
+
   @Override
   public void processMessage(ChannelBuffer msg) throws ProtocolException {
+
+	  ip = new byte[4];
+	  port = new byte[2];
     response = null;
     switch(step) {
     case ASK_AUTH:
       if (isAskAuth(msg)) {
-        response = selectAuth(SocksAuth.NO_AUTH);
+        response = new byte[2];
+        response[0] = (byte) VERSION;
+        response[1] = (byte) 0x00;
       }
       else {
         throw new ProtocolException("invalid auth request");
@@ -48,8 +43,7 @@ public class Socks5Protocol implements SocksProtocol {
       break;
     case REQUEST:
       if (isConnectionRequest(msg)) {
-        processConnection(msg);
-        response = msg.array();
+    	  processConnection(msg);
       }
       else {
         throw new ProtocolException("unsupported command");
@@ -87,35 +81,66 @@ public class Socks5Protocol implements SocksProtocol {
   }
 
   private void processConnection(ChannelBuffer msg) throws ProtocolException {
+
+	  System.out.println("processConnection(..)");
+
     if (!isConnectionRequest(msg)) {
       throw new ProtocolException("unsupported command");
     }
     checkCapacity(msg, 4);
+
+    response = new byte[10];
+    response[0] = 0x05;
+    response[1] = 0x01;
+    response[2] = 0x00;
+
     int addressType = msg.getByte(3);
-    if (addressType == AddressType.IPv4.ordinal()) {
+
+    // Type is IPv4
+    if (addressType == 0x01) {
+
+    	response[3] = 0x01;
       connectIPv4(msg);
     }
-    else if (addressType == AddressType.DOMAIN.ordinal()) {
+
+    // Type is domain name
+    else if (addressType == 0x03) {
+    	response[3] = 0x03;
       connectDomain(msg);
     }
-    else if (addressType == AddressType.IPv6.ordinal()) {
+
+    // Type is IPv6
+    else if (addressType == 0x04) {
+    	response[3] = 0x04;
       connectIPv6(msg);
     }
     else {
       throw new ProtocolException("unsupported address type " + addressType);
     }
+    response[4] = this.ip[0];
+    response[5] = this.ip[1];
+    response[6] = this.ip[2];
+    response[7] = this.ip[3];
+    response[8] = this.port[0];
+    response[9] = this.port[1];
   }
 
   public void connectIPv4(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 10);
-    byte[] addr = new byte[4];
-    msg.getBytes(4, addr);
-    int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
+    msg.getBytes(4, this.ip);
+
+    this.port[0] = msg.getByte(8);
+    this.port[1] = msg.getByte(9);
+
     try {
-      address = new InetSocketAddress(InetAddress.getByAddress(addr), port);
+    	System.out.println("CONNECT TO:");
+    	System.out.println(this.ip);
+    	System.out.println(this.port);
+    	int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
+    	address = new InetSocketAddress(InetAddress.getByAddress(this.ip), port);
     }
     catch(UnknownHostException e) {
-      throw new ProtocolException("invalid ip address " + addr);
+      throw new ProtocolException("invalid ip address " + this.ip);
     }
   }
 
@@ -125,8 +150,20 @@ public class Socks5Protocol implements SocksProtocol {
     checkCapacity(msg, 5 + cnt + 2);
     byte[] domain = new byte[cnt];
     msg.getBytes(5, domain);
+
+    this.port[0] = msg.getByte(5 + cnt);
+    this.port[1] = msg.getByte(5 + cnt + 1);
+
     int port = (((0xFF & msg.getByte(5 + cnt)) << 8) + (0xFF & msg.getByte(5 + cnt + 1)));
     address = new InetSocketAddress(new String(domain), port);
+
+    String ipAddress = address.getAddress().getHostAddress().toString();
+    String[] ipParts = ipAddress.split("\\.");
+
+    this.ip[0] = (byte) Integer.parseInt(ipParts[0]);
+    this.ip[1] = (byte) Integer.parseInt(ipParts[1]);
+    this.ip[2] = (byte) Integer.parseInt(ipParts[2]);
+    this.ip[3] = (byte) Integer.parseInt(ipParts[3]);
   }
 
   public void connectIPv6(ChannelBuffer msg) throws ProtocolException {
@@ -144,7 +181,8 @@ public class Socks5Protocol implements SocksProtocol {
 
   public static boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 3);
-    if (msg.getByte(0) == 5 && msg.getByte(1) == 1 && msg.getByte(2) == 0) {
+    // version = 0x05 && connection = 0x01
+    if (msg.getByte(0) == 5 && msg.getByte(1) == 1) {
       return true;
     }
     return false;
@@ -164,13 +202,6 @@ public class Socks5Protocol implements SocksProtocol {
       }
     }
     return false;
-  }
-
-  public static byte[] selectAuth(SocksAuth auth) {
-    byte[] response = new byte[2];
-    response[0] = (byte) VERSION;
-    response[1] = (byte) auth.ordinal();
-    return response;
   }
 
   @Override

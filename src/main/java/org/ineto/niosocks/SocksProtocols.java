@@ -1,8 +1,8 @@
 package org.ineto.niosocks;
 
-import io.netty.buffer.ChannelBuffer;
-
 import java.net.ProtocolException;
+
+import io.netty.buffer.ChannelBuffer;
 
 public class SocksProtocols {
 

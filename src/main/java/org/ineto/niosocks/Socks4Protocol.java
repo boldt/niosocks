@@ -1,11 +1,11 @@
 package org.ineto.niosocks;
 
-import io.netty.buffer.ChannelBuffer;
-
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.net.UnknownHostException;
+
+import io.netty.buffer.ChannelBuffer;
 
 public class Socks4Protocol implements SocksProtocol {
 

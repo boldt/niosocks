@@ -1,5 +1,10 @@
 package org.ineto.niosocks;
 
+import java.net.InetSocketAddress;
+import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
@@ -7,11 +12,6 @@ import io.netty.channel.socket.ClientSocketChannelFactory;
 import io.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import io.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import io.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor;
-
-import java.net.InetSocketAddress;
-import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class SocksServer {
 
@@ -21,7 +21,7 @@ public class SocksServer {
   private ClientSocketChannelFactory clientFactory;
   private TrafficLogger trafficLogger;
 
-  public SocksServer(String homeDir, Properties props) {
+  public SocksServer(Properties props) {
 
     int port = 1080;
     if (props.getProperty("socks.port") != null) {
@@ -35,7 +35,7 @@ public class SocksServer {
       threads = Integer.parseInt(props.getProperty("socks.threads"));
     }
 
-    trafficLogger = new TrafficLogger(homeDir, props);
+    trafficLogger = new TrafficLogger(props);
 
     clientFactory =  new NioClientSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool());
     factory = new NioServerSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool(), threads);

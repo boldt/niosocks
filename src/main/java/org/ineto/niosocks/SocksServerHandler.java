@@ -1,5 +1,13 @@
 package org.ineto.niosocks;
 
+import java.net.InetSocketAddress;
+import java.net.ProtocolException;
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.log4j.Logger;
+
+import de.uniluebeck.itm.tr.util.StringUtils;
 import io.netty.bootstrap.ClientBootstrap;
 import io.netty.buffer.ChannelBuffer;
 import io.netty.buffer.ChannelBuffers;
@@ -13,13 +21,6 @@ import io.netty.channel.ExceptionEvent;
 import io.netty.channel.MessageEvent;
 import io.netty.channel.SimpleChannelHandler;
 import io.netty.channel.socket.ClientSocketChannelFactory;
-
-import java.net.InetSocketAddress;
-import java.net.ProtocolException;
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.apache.log4j.Logger;
 
 public class SocksServerHandler extends SimpleChannelHandler {
 
@@ -55,6 +56,15 @@ public class SocksServerHandler extends SimpleChannelHandler {
   @Override
   public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
     ChannelBuffer msg = (ChannelBuffer) e.getMessage();
+    System.out.println("READABLE BYTES:" + msg.readableBytes());
+    msg = msg.slice(msg.readerIndex(), msg.writerIndex());
+
+    System.out.println("=================");
+    System.out.println(e);
+    System.out.println(msg);
+    System.out.println(StringUtils.toHexString(msg.array()));
+    System.out.println("=================");
+
 
     if (outboundChannel != null) {
       if (outboundChannel.isWritable()) {
@@ -67,13 +77,14 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
 
-    //System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
+    System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
 
     if (socksProtocol == null) {
       try {
         socksProtocol = SocksProtocols.create(msg);
       }
       catch(ProtocolException ex) {
+    	  System.out.println("A");
         log.warn("unknown protocol for " + toHexString(msg.array()), ex);
         Channels.close(e.getChannel());
         return;
@@ -84,6 +95,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
       socksProtocol.processMessage(msg);
     }
     catch(ProtocolException ex) {
+  	  System.out.println("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()));
       log.warn("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()), ex);
       Channels.close(e.getChannel());
       return;
@@ -111,7 +123,9 @@ public class SocksServerHandler extends SimpleChannelHandler {
             inboundChannel.setReadable(true);
             socksProtocol.setConnected(true);
             if (socksProtocol.hasResponse()) {
-              write(inboundChannel, ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
+            	byte[] res = socksProtocol.getResponse();
+            	System.out.println("WRITE RESPONSE: " + StringUtils.toHexString(res));
+              write(inboundChannel, ChannelBuffers.wrappedBuffer(res));
             }
           }
           else {
@@ -141,6 +155,8 @@ public class SocksServerHandler extends SimpleChannelHandler {
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) {
+	  System.out.println("C");
+
     log.error("Unexpected exception from downstream.", e.getCause());
     Channels.close(e.getChannel());
     if (outboundChannel != null && outboundChannel.isConnected()) {
