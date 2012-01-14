@@ -147,14 +147,6 @@ public class Socks5Protocol implements SocksProtocol {
         response[2] = 0x00; // RSV is reserved
     	response[3] = 0x01; // Address type is IP V4
 
-    	// Port and ip are known because IP V4 is uses
-        response[4] = this.ip[0];
-        response[5] = this.ip[1];
-        response[6] = this.ip[2];
-        response[7] = this.ip[3];
-        response[8] = this.port[0];
-        response[9] = this.port[1];
-
     	try {
     		connectIPv4(msg);
     		response[1] = 0x00; // succeeded
@@ -163,6 +155,16 @@ public class Socks5Protocol implements SocksProtocol {
 		} catch (ProtocolException e) {
 			response[1] = 0x01; // General SOCKS server failure
 		}
+
+    	// Port and ip are known because IP V4 is uses
+    	// parsed in the connectIPv4()
+        response[4] = this.ip[0];
+        response[5] = this.ip[1];
+        response[6] = this.ip[2];
+        response[7] = this.ip[3];
+        response[8] = this.port[0];
+        response[9] = this.port[1];
+
     }
 
     // Type is domain name
@@ -208,6 +210,7 @@ public class Socks5Protocol implements SocksProtocol {
 
 	int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
 	address = new InetSocketAddress(InetAddress.getByAddress(this.ip), port);
+    addressToByte(address);
   }
 
   public void connectDomain(ChannelBuffer msg) throws ProtocolException {
@@ -222,15 +225,18 @@ public class Socks5Protocol implements SocksProtocol {
 
     int port = (((0xFF & msg.getByte(5 + cnt)) << 8) + (0xFF & msg.getByte(5 + cnt + 1)));
     address = new InetSocketAddress(new String(domain), port);
-
-    String ipAddress = address.getAddress().getHostAddress().toString();
-    String[] ipParts = ipAddress.split("\\.");
-
-    this.ip[0] = (byte) Integer.parseInt(ipParts[0]);
-    this.ip[1] = (byte) Integer.parseInt(ipParts[1]);
-    this.ip[2] = (byte) Integer.parseInt(ipParts[2]);
-    this.ip[3] = (byte) Integer.parseInt(ipParts[3]);
+    addressToByte(address);
   }
+
+  private void addressToByte(InetSocketAddress address) {
+	    String ipAddress = address.getAddress().getHostAddress().toString();
+	    String[] ipParts = ipAddress.split("\\.");
+	    this.ip[0] = (byte) Integer.parseInt(ipParts[0]);
+	    this.ip[1] = (byte) Integer.parseInt(ipParts[1]);
+	    this.ip[2] = (byte) Integer.parseInt(ipParts[2]);
+	    this.ip[3] = (byte) Integer.parseInt(ipParts[3]);
+  }
+
 
   /*
    * NOT TESTED
