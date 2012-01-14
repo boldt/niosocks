@@ -56,15 +56,13 @@ public class SocksServerHandler extends SimpleChannelHandler {
   @Override
   public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
     ChannelBuffer msg = (ChannelBuffer) e.getMessage();
-    System.out.println("READABLE BYTES:" + msg.readableBytes());
+    //System.out.println("READABLE BYTES:" + msg.readableBytes());
     msg = msg.slice(msg.readerIndex(), msg.writerIndex());
 
-    System.out.println("=================");
-    System.out.println(e);
-    System.out.println(msg);
-    System.out.println(StringUtils.toHexString(msg.array()));
-    System.out.println("=================");
-
+    //System.out.println(e);
+    //System.out.println(msg);
+    //System.out.println(StringUtils.toHexString(msg.array()));
+    //System.out.println("=================");
 
     if (outboundChannel != null) {
       if (outboundChannel.isWritable()) {
@@ -77,14 +75,13 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
 
-    System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
+    // System.out.println("Msg = " + toHexString(msg.array()) + ", cap = " + msg.capacity());
 
     if (socksProtocol == null) {
       try {
         socksProtocol = SocksProtocols.create(msg);
       }
       catch(ProtocolException ex) {
-    	  System.out.println("A");
         log.warn("unknown protocol for " + toHexString(msg.array()), ex);
         Channels.close(e.getChannel());
         return;
@@ -95,7 +92,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
       socksProtocol.processMessage(msg);
     }
     catch(ProtocolException ex) {
-  	  System.out.println("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()));
+  	  //System.out.println("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()));
       log.warn("invalid protocol " + socksProtocol + " for " + toHexString(msg.array()), ex);
       Channels.close(e.getChannel());
       return;

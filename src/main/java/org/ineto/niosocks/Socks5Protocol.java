@@ -145,9 +145,9 @@ public class Socks5Protocol implements SocksProtocol {
         response = new byte[10];
         response[0] = 0x05; // Version is SOCKS 5
         response[2] = 0x00; // RSV is reserved
-    	response[3] = 0x01; // Address type is IPv4
+    	response[3] = 0x01; // Address type is IP V4
 
-    	// Port and ip is known because of the ATYP
+    	// Port and ip are known because IP V4 is uses
         response[4] = this.ip[0];
         response[5] = this.ip[1];
         response[6] = this.ip[2];
@@ -167,8 +167,25 @@ public class Socks5Protocol implements SocksProtocol {
 
     // Type is domain name
     else if (addressType == 0x03) {
-    	response[3] = 0x03;
-      connectDomain(msg);
+
+    	response = new byte[10];
+        response[0] = 0x05; // Version is SOCKS 5
+        response[2] = 0x00; // RSV is reserved
+    	response[3] = 0x03; // Address type is DOMAINNAME
+
+    	try {
+    		connectDomain(msg);
+    		response[1] = 0x00; // succeeded
+    	  	// Port and ip are known after the connection to the domain was successful.
+            response[4] = this.ip[0];
+            response[5] = this.ip[1];
+            response[6] = this.ip[2];
+            response[7] = this.ip[3];
+            response[8] = this.port[0];
+            response[9] = this.port[1];
+		} catch (ProtocolException e) {
+			response[1] = 0x01; // General SOCKS server failure
+		}
     }
 
     // Type is IPv6
