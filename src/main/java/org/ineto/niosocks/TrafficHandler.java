@@ -1,5 +1,8 @@
 package org.ineto.niosocks;
 
+import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import io.netty.buffer.ChannelBuffer;
 import io.netty.buffer.ChannelBuffers;
 import io.netty.channel.Channel;
@@ -11,16 +14,12 @@ import io.netty.channel.ExceptionEvent;
 import io.netty.channel.MessageEvent;
 import io.netty.channel.SimpleChannelUpstreamHandler;
 
-import java.util.Properties;
-import java.util.concurrent.atomic.AtomicInteger;
-
 public class TrafficHandler extends SimpleChannelUpstreamHandler {
 
   private final Channel channel;
   private final int connectionId;
   private final TrafficLogger trafficLogger;
 
-  private byte[] contentRemoveByteArray;
   private AtomicInteger num = new AtomicInteger(0);
 
   public TrafficHandler(Properties props, Channel channel, int connectionId, TrafficLogger trafficLogger) {
@@ -30,7 +29,7 @@ public class TrafficHandler extends SimpleChannelUpstreamHandler {
     String contentRemove = props.getProperty("content.modifier.remove", null);
     if (contentRemove != null) {
       try {
-        contentRemoveByteArray = contentRemove.getBytes("UTF-8");
+        contentRemove.getBytes("UTF-8");
       }
       catch(Exception e) {
       }
