@@ -55,9 +55,17 @@ public class Socks5Reply {
 		this.port[1] = port2;
 	}
 
+	public void setATYP(Byte aTYP) {
+		this.ATYP = aTYP;
+	}
+
+	public void setREP(Byte rEP) {
+		this.REP = rEP;
+	}
+
 	@Override
 	public String toString() {
-		return StringUtils.toHexString(getBytes());
+		return StringUtils.toHexString(this.getBytes());
 	}
 
 }
