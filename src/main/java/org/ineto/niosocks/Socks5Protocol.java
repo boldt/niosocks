@@ -9,96 +9,90 @@ import java.net.UnknownHostException;
 
 public class Socks5Protocol implements SocksProtocol {
 
-  private enum Step {
-    ASK_AUTH,
-    REQUEST,
-    CONNECT;
-  }
+	 private enum Step {
+		 METHOD_SELECTION,
+		 CONNECT,
+		 BIND;
+	 };
 
-  // Start with the AUTH
-  private Step step = Step.ASK_AUTH;
-  private Socks5Packet response = null;
-  private InetSocketAddress address = null;
+	private Socks5Packet response = null;
+	private InetSocketAddress address = null;
 
-  // Stores the IP and prot of the connection
-  private byte[] ip = null;
-  private byte[] port = null;
+	// Stores the IP and port of the connection
+	private byte[] ip = null;
+	private byte[] port = null;
 
-  @Override
-  public void processMessage(ChannelBuffer msg) throws ProtocolException {
+	private Step lastStep = null ;
 
-    response = null;
-    switch(step) {
-	  /* The client connects to the server, and sends a version
-	   * identifier/method selection message:
-	   *
-       * +----+----------+----------+
-       * |VER | NMETHODS | METHODS  |
-       * +----+----------+----------+
-       * | 1  |    1     | 1 to 255 |
-       * +----+----------+----------+
-       *
-	   */
-    case ASK_AUTH:
-      if (isAskAuth(msg)) {
-    	  /*
-    	   * The server selects from one of the methods given in METHODS, and
-    	   * sends a METHOD selection message:
-		   *
-           * +----+--------+
-           * |VER | METHOD |
-           * +----+--------+
-           * | 1  |   1    |
-           * +----+--------+
-           *
-           */
-    	  // We just accept NO AUTHENTICATION (0x00), so lets search for it
-    	  byte[] response = new byte[2];
-    	  response[0] = (byte) 0x05;
-    	  response[1] = (byte) 0x00;
-    	  this.response = new SimpleSocks5Packet(response);
+	@Override
+	public void processMessage(ChannelBuffer msg) throws ProtocolException {
 
-    	  /*
-    	  int nmethods = msg.getByte(1);
-    	  for(int i = 0; i < nmethods; i++) {
-    		  if(msg.getByte(1 + i) == 0x00) {
-    			  // Generate the METHOD selection message
-    		  }
-    	  }
-    	  */
-      }
-      else {
-        throw new ProtocolException("invalid auth request");
-      }
-      break;
-    case REQUEST:
+		response = null;
 
-    	/*
-        The SOCKS request is formed as follows:
+		if (isIdentifierMethodSelectionMessage(msg) &&  lastStep == null) {
+			System.out.println("STEP 1");
+			/*
+			 * The client connects to the server, and sends a version
+			 * identifier/method selection message:
+			 *
+			 * +----+----------+----------+
+			 * |VER | NMETHODS | METHODS  |
+			 * +----+----------+----------+
+			 * | 1  |    1     | 1 to 255 |
+			 * +----+----------+----------+
+			 */
 
-            +----+-----+-------+------+----------+----------+
-            |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-            +----+-----+-------+------+----------+----------+
-            | 1  |  1  | X'00' |  1   | Variable |    2     |
-            +----+-----+-------+------+----------+----------+
-     */
+			/*
+			 * TODO: Seach for 0x00
+    	  		int nmethods = msg.getByte(1);
+    	  		for(int i = 0; i < nmethods; i++) {
+    		  		if(msg.getByte(1 + i) == 0x00) {
+    			  		// Generate the METHOD selection message
+    		  		}
+    	  		}
+			 */
 
-      if (isConnectionRequest(msg)) {
-    	  processConnection(msg);
-      }
-      else {
-        throw new ProtocolException("unsupported command");
-      }
-      break;
-    }
-    step = Step.values()[step.ordinal() + 1];
-  }
+			/*
+			 * The server selects from one of the methods given in METHODS, and
+			 * sends a METHOD selection message:
+			 *
+			 * +----+--------+
+			 * |VER | METHOD |
+			 * +----+--------+
+			 * | 1  |   1    |
+			 * +----+--------+
+			 *
+			 */
+
+			// We just accept NO AUTHENTICATION (0x00)
+			byte[] response = new byte[2];
+			response[0] = (byte) 0x05;
+			response[1] = (byte) 0x00;
+			this.response = new SimpleSocks5Packet(response);
+			this.lastStep = Step.METHOD_SELECTION;
+		} else if (isConnectionRequest(msg) && lastStep == Step.METHOD_SELECTION) {
+			System.out.println("STEP 2: CONNECT");
+			processConnection(msg);
+			lastStep = Step.CONNECT;
+		} else if(isBind(msg) && lastStep == Step.METHOD_SELECTION) {
+			System.out.println("STEP 2: BIND");
+    		processBind(msg);
+    		lastStep = Step.BIND;
+		} else {
+			throw new ProtocolException("invalid auth request");
+		}
+	}
 
   @Override
   public void setConnected(boolean connected) {
+	  if(this.response != null && this.response instanceof Socks5Reply) {
 
-	  if(this.response instanceof Socks5Reply) {
-
+		  Socks5Reply reply = (Socks5Reply) this.response;
+		  if(connected) {
+	    		reply.setREP(SOCKS.REP_SUCCEEDED);
+		  } else {
+	    		reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
+		  }
 	  }
 
 	  /*
@@ -126,6 +120,27 @@ public class Socks5Protocol implements SocksProtocol {
   @Override
   public InetSocketAddress getOutboundAddress() {
     return address;
+  }
+
+  private void processBind(ChannelBuffer msg) {
+
+	  /*
+	      try{
+	        ss = new ServerSocket(port,backlog,localIP);
+	        log("Starting SOCKS Proxy on:"+ss.getInetAddress().getHostAddress()+":"
+	                                      +ss.getLocalPort());
+	        while(true){
+	          Socket s = ss.accept();
+	          log("Accepted from:"+s.getInetAddress().getHostName()+":"
+	                              +s.getPort());
+	          ProxyServer ps = new ProxyServer(auth,s);
+	          (new Thread(ps)).start();
+	        }
+	      }catch(IOException ioe){
+	        ioe.printStackTrace();
+	      }finally{
+	      }
+	  */
   }
 
   private void processConnection(ChannelBuffer msg) throws ProtocolException {
@@ -156,7 +171,6 @@ public class Socks5Protocol implements SocksProtocol {
 
     	try {
     		connectIPv4(msg);
-    		reply.setREP(SOCKS.REP_SUCCEEDED);
 		} catch (UnknownHostException e) {
 			reply.setREP(SOCKS.REP_HOST_UNREACHABLE);
 		} catch (ProtocolException e) {
@@ -196,7 +210,7 @@ public class Socks5Protocol implements SocksProtocol {
     }
   }
 
-  public void connectIPv4(ChannelBuffer msg) throws ProtocolException, UnknownHostException {
+  private void connectIPv4(ChannelBuffer msg) throws ProtocolException, UnknownHostException {
     checkCapacity(msg, 10);
     msg.getBytes(4, this.ip);
 
@@ -209,7 +223,7 @@ public class Socks5Protocol implements SocksProtocol {
 
   }
 
-  public void connectDomain(ChannelBuffer msg) throws ProtocolException {
+  private void connectDomain(ChannelBuffer msg) throws ProtocolException {
     checkCapacity(msg, 5);
     int cnt = msg.getByte(4);
     checkCapacity(msg, 5 + cnt + 2);
@@ -241,14 +255,23 @@ public class Socks5Protocol implements SocksProtocol {
     }
   }
 
-  public static boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
+  private boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
 
-    checkCapacity(msg, 3);
-    // version = 0x05 && connection = 0x01
-    if (msg.getByte(0) == 5 && msg.getByte(1) == 1) {
+    checkCapacity(msg, 2);
+    // version = 0x05 + connection = 0x01
+    if (msg.getByte(0) == 0x05 && msg.getByte(1) == 0x01) {
       return true;
     }
     return false;
+  }
+
+  private boolean isBind(ChannelBuffer msg) throws ProtocolException {
+	    checkCapacity(msg, 2);
+	    // version = 0x05 + bind = 0x02
+	    if (msg.getByte(0) == 0x05 && msg.getByte(1) == 0x02) {
+	      return true;
+	    }
+	    return false;
   }
 
   public static void checkCapacity(ChannelBuffer msg, int need) throws ProtocolException {
@@ -262,7 +285,7 @@ public class Socks5Protocol implements SocksProtocol {
    * @param msg
    * @return
    */
-  public static boolean isAskAuth(ChannelBuffer msg) {
+  private boolean isIdentifierMethodSelectionMessage(ChannelBuffer msg) {
     if (msg.capacity() >= 3 && msg.capacity() < 257) {
       int cnt = msg.getByte(1);
       if (msg.capacity() == cnt + 2) {
@@ -270,6 +293,14 @@ public class Socks5Protocol implements SocksProtocol {
       }
     }
     return false;
+  }
+
+  public boolean isBIND() {
+	return (lastStep == Step.BIND);
+  }
+
+  public boolean isCONNECT() {
+	return (lastStep == Step.CONNECT);
   }
 
   @Override

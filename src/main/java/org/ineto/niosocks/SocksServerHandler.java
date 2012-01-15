@@ -98,6 +98,15 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
 
+    boolean isBind = false;
+    boolean isCOnnect = false;
+
+    if(socksProtocol instanceof Socks5Protocol) {
+    	Socks5Protocol s5 = (Socks5Protocol) socksProtocol;
+    	isBind = s5.isBIND();
+    	isCOnnect = s5.isCONNECT();
+    }
+
     // TODO: Probelmatic for bind
     if (socksProtocol.isReady()) {
       final InetSocketAddress outboundAddress = socksProtocol.getOutboundAddress();
