@@ -4,13 +4,14 @@ import java.net.InetAddress;
 
 import de.uniluebeck.itm.tr.util.StringUtils;
 
-public class Socks5Reply {
+public class Socks5Reply implements Socks5Packet {
 
 	private Byte ATYP = null;
 	private Byte REP = null;
 	private byte[] ip = null;
 	private byte[] port = null;
 
+	@Override
 	public byte[] getBytes() {
 
 		byte[] reply = new byte[10];
