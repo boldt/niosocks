@@ -38,6 +38,10 @@ public class Socks5Reply implements Socks5Packet {
 		this.ip = ip.getAddress();
 	}
 
+	public void setIp(byte[] ip) {
+		this.ip = ip;
+	}
+
 	public void setPort(Integer port) {
 		this.port = new byte[2];
 		this.port[0] = (byte) (0xFF & (port.byteValue() >> 8));

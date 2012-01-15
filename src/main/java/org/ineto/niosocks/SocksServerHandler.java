@@ -98,6 +98,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
 
+    // TODO: Probelmatic for bind
     if (socksProtocol.isReady()) {
       final InetSocketAddress outboundAddress = socksProtocol.getOutboundAddress();
       System.out.println("Connect " + outboundAddress);

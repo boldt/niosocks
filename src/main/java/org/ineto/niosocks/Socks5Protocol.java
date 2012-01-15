@@ -17,7 +17,7 @@ public class Socks5Protocol implements SocksProtocol {
 
   // Start with the AUTH
   private Step step = Step.ASK_AUTH;
-  private byte[] response = null;
+  private Socks5Packet response = null;
   private InetSocketAddress address = null;
 
   // Stores the IP and prot of the connection
@@ -53,9 +53,11 @@ public class Socks5Protocol implements SocksProtocol {
            *
            */
     	  // We just accept NO AUTHENTICATION (0x00), so lets search for it
-    	  response = new byte[2];
+    	  byte[] response = new byte[2];
     	  response[0] = (byte) 0x05;
     	  response[1] = (byte) 0x00;
+    	  this.response = new SimpleSocks5Packet(response);
+
     	  /*
     	  int nmethods = msg.getByte(1);
     	  for(int i = 0; i < nmethods; i++) {
@@ -94,9 +96,16 @@ public class Socks5Protocol implements SocksProtocol {
 
   @Override
   public void setConnected(boolean connected) {
+
+	  if(this.response instanceof Socks5Reply) {
+
+	  }
+
+	  /*
     if (step == Step.CONNECT && response != null && response.length >= 2) {
       response[1] = connected ? (byte) 0 : 1;
     }
+    */
   }
 
   @Override
@@ -106,7 +115,7 @@ public class Socks5Protocol implements SocksProtocol {
 
   @Override
   public byte[] getResponse() {
-    return response;
+    return response.getBytes();
   }
 
   @Override
@@ -142,51 +151,37 @@ public class Socks5Protocol implements SocksProtocol {
 
     // Type is IPv4
     if (addressType == 0x01) {
-        response = new byte[10];
-        response[0] = 0x05; // Version is SOCKS 5
-        response[2] = 0x00; // RSV is reserved
-    	response[3] = 0x01; // Address type is IP V4
+    	Socks5Reply reply = new Socks5Reply();
+        reply.setATYP(SOCKS.ATYP_IPV4);
 
     	try {
     		connectIPv4(msg);
-    		response[1] = 0x00; // succeeded
+    		reply.setREP(SOCKS.REP_SUCCEEDED);
 		} catch (UnknownHostException e) {
-			response[1] = 0x04; // Host unreachable
+			reply.setREP(SOCKS.REP_HOST_UNREACHABLE);
 		} catch (ProtocolException e) {
-			response[1] = 0x01; // General SOCKS server failure
+			reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
 		}
 
-    	// Port and ip are known because IP V4 is uses
-    	// parsed in the connectIPv4()
-        response[4] = this.ip[0];
-        response[5] = this.ip[1];
-        response[6] = this.ip[2];
-        response[7] = this.ip[3];
-        response[8] = this.port[0];
-        response[9] = this.port[1];
-
+    	reply.setIp(this.ip);
+    	reply.setPort(this.port);
+    	this.response = reply;
     }
 
     // Type is domain name
     else if (addressType == 0x03) {
 
-    	response = new byte[10];
-        response[0] = 0x05; // Version is SOCKS 5
-        response[2] = 0x00; // RSV is reserved
-    	response[3] = 0x03; // Address type is DOMAINNAME
+    	Socks5Reply reply = new Socks5Reply();
+    	reply.setATYP(SOCKS.ATYP_DOMAINNAME);
 
     	try {
     		connectDomain(msg);
-    		response[1] = 0x00; // succeeded
-    	  	// Port and ip are known after the connection to the domain was successful.
-            response[4] = this.ip[0];
-            response[5] = this.ip[1];
-            response[6] = this.ip[2];
-            response[7] = this.ip[3];
-            response[8] = this.port[0];
-            response[9] = this.port[1];
+    		reply.setREP(SOCKS.REP_SUCCEEDED);
+    		reply.setIp(this.ip);
+    		reply.setPort(this.port);
 		} catch (ProtocolException e) {
-			response[1] = 0x01; // General SOCKS server failure
+			reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
+			this.response = reply;
 		}
     }
 
@@ -210,7 +205,8 @@ public class Socks5Protocol implements SocksProtocol {
 
 	int port = (((0xFF & msg.getByte(8)) << 8) + (0xFF & msg.getByte(9)));
 	address = new InetSocketAddress(InetAddress.getByAddress(this.ip), port);
-    addressToByte(address);
+	this.ip = address.getAddress().getAddress();
+
   }
 
   public void connectDomain(ChannelBuffer msg) throws ProtocolException {
@@ -225,18 +221,9 @@ public class Socks5Protocol implements SocksProtocol {
 
     int port = (((0xFF & msg.getByte(5 + cnt)) << 8) + (0xFF & msg.getByte(5 + cnt + 1)));
     address = new InetSocketAddress(new String(domain), port);
-    addressToByte(address);
-  }
+	this.ip = address.getAddress().getAddress();
 
-  private void addressToByte(InetSocketAddress address) {
-	    String ipAddress = address.getAddress().getHostAddress().toString();
-	    String[] ipParts = ipAddress.split("\\.");
-	    this.ip[0] = (byte) Integer.parseInt(ipParts[0]);
-	    this.ip[1] = (byte) Integer.parseInt(ipParts[1]);
-	    this.ip[2] = (byte) Integer.parseInt(ipParts[2]);
-	    this.ip[3] = (byte) Integer.parseInt(ipParts[3]);
   }
-
 
   /*
    * NOT TESTED

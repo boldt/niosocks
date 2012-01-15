@@ -37,7 +37,13 @@ public class SocksServer {
 
     trafficLogger = new TrafficLogger(props);
 
+    // Needed to be a client after CONNECT
     clientFactory =  new NioClientSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool());
+
+    // Needed to be a server after BIND
+    // FIXME:
+
+    // Needed for the SOCKS server itself
     factory = new NioServerSocketChannelFactory(Executors.newCachedThreadPool(), Executors.newCachedThreadPool(), threads);
     ServerBootstrap bootstrap = new ServerBootstrap(factory);
 
