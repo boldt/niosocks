@@ -108,8 +108,6 @@ public class SocksServerHandler extends SimpleChannelHandler {
     }
 
     if (isConnect && socksProtocol.isReady()) {
-
-    	/*
       final InetSocketAddress outboundAddress = socksProtocol.getOutboundAddress();
       System.out.println("Connect " + outboundAddress);
 
@@ -152,7 +150,6 @@ public class SocksServerHandler extends SimpleChannelHandler {
     }
     else if (socksProtocol.hasResponse()) {
       write(e.getChannel(),  ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
-    	 */
     }
 
   }

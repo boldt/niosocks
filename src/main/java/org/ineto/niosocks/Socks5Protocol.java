@@ -7,6 +7,8 @@ import java.net.InetSocketAddress;
 import java.net.ProtocolException;
 import java.net.UnknownHostException;
 
+import de.uniluebeck.itm.tr.util.StringUtils;
+
 public class Socks5Protocol implements SocksProtocol {
 
 	 private enum Step {
@@ -26,6 +28,9 @@ public class Socks5Protocol implements SocksProtocol {
 
 	@Override
 	public void processMessage(ChannelBuffer msg) throws ProtocolException {
+
+		System.out.println("PROCESS:");
+		System.out.println(StringUtils.toHexString(msg.array()));
 
 		response = null;
 
@@ -50,6 +55,7 @@ public class Socks5Protocol implements SocksProtocol {
     			  		// Generate the METHOD selection message
     		  		}
     	  		}
+    	  		else: Set to 0xFF as Error
 			 */
 
 			/*
@@ -74,7 +80,7 @@ public class Socks5Protocol implements SocksProtocol {
 			System.out.println("STEP 2: CONNECT");
 			processConnection(msg);
 			lastStep = Step.CONNECT;
-		} else if(isBind(msg) && lastStep == Step.METHOD_SELECTION) {
+		} else if(isBindRequest(msg) && lastStep == Step.METHOD_SELECTION) {
 			System.out.println("STEP 2: BIND");
     		processBind(msg);
     		lastStep = Step.BIND;
@@ -85,13 +91,13 @@ public class Socks5Protocol implements SocksProtocol {
 
   @Override
   public void setConnected(boolean connected) {
-	  if(this.response != null && this.response instanceof Socks5Reply) {
+	  if(lastStep == Step.CONNECT && this.response != null && this.response instanceof Socks5Reply) {
 
 		  Socks5Reply reply = (Socks5Reply) this.response;
 		  if(connected) {
-	    		reply.setREP(SOCKS.REP_SUCCEEDED);
+	    		reply.setREP(SOCKS.REP.SUCCEEDED);
 		  } else {
-	    		reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
+	    		reply.setREP(SOCKS.REP.GENERAL_SOCKS_SERVER_FAILURE);
 		  }
 	  }
 
@@ -167,14 +173,14 @@ public class Socks5Protocol implements SocksProtocol {
     // Type is IPv4
     if (addressType == 0x01) {
     	Socks5Reply reply = new Socks5Reply();
-        reply.setATYP(SOCKS.ATYP_IPV4);
+        reply.setATYP(SOCKS.ATYP.IPV4);
 
     	try {
     		connectIPv4(msg);
 		} catch (UnknownHostException e) {
-			reply.setREP(SOCKS.REP_HOST_UNREACHABLE);
+			reply.setREP(SOCKS.REP.HOST_UNREACHABLE);
 		} catch (ProtocolException e) {
-			reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
+			reply.setREP(SOCKS.REP.GENERAL_SOCKS_SERVER_FAILURE);
 		}
 
     	reply.setIp(this.ip);
@@ -186,15 +192,15 @@ public class Socks5Protocol implements SocksProtocol {
     else if (addressType == 0x03) {
 
     	Socks5Reply reply = new Socks5Reply();
-    	reply.setATYP(SOCKS.ATYP_DOMAINNAME);
+    	reply.setATYP(SOCKS.ATYP.DOMAINNAME);
 
     	try {
     		connectDomain(msg);
-    		reply.setREP(SOCKS.REP_SUCCEEDED);
+    		reply.setREP(SOCKS.REP.SUCCEEDED);
     		reply.setIp(this.ip);
     		reply.setPort(this.port);
 		} catch (ProtocolException e) {
-			reply.setREP(SOCKS.REP_GENERAL_SOCKS_SERVER_FAILURE);
+			reply.setREP(SOCKS.REP.GENERAL_SOCKS_SERVER_FAILURE);
 			this.response = reply;
 		}
     }
@@ -255,24 +261,21 @@ public class Socks5Protocol implements SocksProtocol {
     }
   }
 
-  private boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
-
-    checkCapacity(msg, 2);
-    // version = 0x05 + connection = 0x01
-    if (msg.getByte(0) == 0x05 && msg.getByte(1) == 0x01) {
-      return true;
+    private boolean isConnectionRequest(ChannelBuffer msg) throws ProtocolException {
+    	checkCapacity(msg, 2);
+    	if (msg.getByte(0) == SOCKS.VER_5 && msg.getByte(1) == SOCKS.CMD.CONNECT.byteValue()) {
+    		return true;
+    	}
+    	return false;
     }
-    return false;
-  }
 
-  private boolean isBind(ChannelBuffer msg) throws ProtocolException {
-	    checkCapacity(msg, 2);
-	    // version = 0x05 + bind = 0x02
-	    if (msg.getByte(0) == 0x05 && msg.getByte(1) == 0x02) {
-	      return true;
-	    }
-	    return false;
-  }
+    private boolean isBindRequest(ChannelBuffer msg) throws ProtocolException {
+    	checkCapacity(msg, 2);
+    	if (msg.getByte(0) == SOCKS.VER_5 && msg.getByte(1) == SOCKS.CMD.BIND.byteValue()) {
+    		return true;
+    	}
+    	return false;
+    }
 
   public static void checkCapacity(ChannelBuffer msg, int need) throws ProtocolException {
     if (msg.capacity() < need) {
