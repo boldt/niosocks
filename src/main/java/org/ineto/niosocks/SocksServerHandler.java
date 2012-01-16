@@ -98,17 +98,18 @@ public class SocksServerHandler extends SimpleChannelHandler {
       return;
     }
 
+    boolean isConnect = true;
     boolean isBind = false;
-    boolean isCOnnect = false;
 
     if(socksProtocol instanceof Socks5Protocol) {
     	Socks5Protocol s5 = (Socks5Protocol) socksProtocol;
     	isBind = s5.isBIND();
-    	isCOnnect = s5.isCONNECT();
+    	isConnect = s5.isCONNECT();
     }
 
-    // TODO: Probelmatic for bind
-    if (socksProtocol.isReady()) {
+    if (isConnect && socksProtocol.isReady()) {
+
+    	/*
       final InetSocketAddress outboundAddress = socksProtocol.getOutboundAddress();
       System.out.println("Connect " + outboundAddress);
 
@@ -151,6 +152,7 @@ public class SocksServerHandler extends SimpleChannelHandler {
     }
     else if (socksProtocol.hasResponse()) {
       write(e.getChannel(),  ChannelBuffers.wrappedBuffer(socksProtocol.getResponse()));
+    	 */
     }
 
   }
